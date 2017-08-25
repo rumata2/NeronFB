@@ -106,68 +106,52 @@ function getCommentsFromPage(objectID, count) {
         var addPostSql = "INSERT INTO Posts VALUES(\'" + val.id + "\',\'" + val.created_time + "\', " + SqlString.escape(val.message) + ");"
         dbConnection.query(addPostSql, function (err, result) {
           if (err) throw err;
-          console.log("Add Post Result: " + result);
+          //console.log("Add Post Result: " + result);
         });
 
-        getCommentsFromPost(val.id);
+        var fbApiCall = "/" + val.id + "/comments";
+        getCommentsFromPost(val.id, fbApiCall);
       }
     });
-}
+  }
 
 
-async function getCommentsFromPost(postId) {
-  var fbApiCall = "/" + postId + "/comments";
-  FB.api(
-    fbApiCall,
-    'GET',
-    {"summary" : true, "date_format" : "d-m-y h:i"},
-    function(response) {
-      if(!response || response.error) {
-        console.log(!response ? 'getPost - error occurred' : response.error);
-        return;
-      }
+  async function getCommentsFromPost(postId, fbApiCall) {
+    FB.api(
+      fbApiCall,
+      'GET',
+      {"summary" : true, "date_format" : "d-m-y h:i"},
+      function(response) {
+        if(!response || response.error) {
+          console.log(!response ? 'getPost - error occurred' : response.error);
+          return;
+        }
 
-      if (response.summary.total_count < commentsThreshold) {
-        return;
-      }
+        if (response.summary.total_count < commentsThreshold) {
+          return;
+        }
 
-      // create an entry for each comment
-      for (var i=0; i<response.data.length; i++) {
-        var val = response.data[i];
-        var addCommentSql = "INSERT INTO Comments VALUES(\'" + val.id + "\'," + SqlString.escape(val.from.name) + ",\'" + val.from.id + "\'," + SqlString.escape(val.message) +
-        ",\'" + val.created_time + "\',\'" + postId + "\');"
-        console.log(addCommentSql);
-        dbConnection.query(addCommentSql, function (err, result) {
-          if (err) {
-            console.log("Add Comment Error: " + err);
-            throw err;
-          }
-          console.log("Add Comment Result: " + result);
-        });
-      }
-      // create an entry for the post
-      //fs.appendFile("comments.txt", val.from.name + " - " + val.message + "\n", function() {
-      /*var addCommentSql = "INSERT INTO Comments VALUES(\'" + val.id + "\',\'" + val.created_time + "\', " + SqlString.escape(val.message) + ");"
-      dbConnection.query(addPostSql, function (err, result) {
-      if (err) throw err;
-      console.log("Add Post Result: " + result);
-    });
-  });*/
+        // create an entry for each comment
+        for (var i=0; i<response.data.length; i++) {
+          var val = response.data[i];
+          var addCommentSql = "INSERT INTO Comments VALUES(\'" + val.id + "\'," + SqlString.escape(val.from.name) + ",\'" + val.from.id + "\'," + SqlString.escape(val.message) +
+          ",\'" + val.created_time + "\',\'" + postId + "\');"
+          dbConnection.query(addCommentSql, function (err, result) {
+            if (err) {
+              console.log("Add Comment Error: " + err);
+              //throw err;
+            }
+            //console.log("Add Comment Result: " + result);
+          });
+        }
 
-  // next page
-  /*if (typeof response.paging === "undefined" || typeof response.paging.next === "undefined" ) {
-  console.log("data colllected");
-} else {
-fbApiCall =
-url.parse(response.paging.next);
 
-/*      FB.api(
-apiURL.path,
-'GET',
-{},
-processComments);
-}
-});
-}*/
-});
-}
+        // next page
+        if (typeof response.paging === "undefined" || typeof response.paging.next === "undefined" ) {
+          console.log("data colllected");
+        } else {
+          var apiURL = url.parse(response.paging.next);
+          getCommentsFromPost(postId, apiURL.path);
+        }
+      });
+    }
