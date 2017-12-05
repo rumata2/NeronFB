@@ -107,10 +107,11 @@ async function indexComments(baseDir, callback) {
       console.log(i);
     }
 
+    var j=0;
     console.log(comments.length);
     comments.reduce(function(p, item) {
       return p.then(function() {
-        console.log("processing - " + item);
+        console.log("processing - " + (j++));
         return client.index({
           index: 'fbposts',
           type: 'post',
@@ -132,40 +133,64 @@ function processCommentFile (postId, filename) {
   var commentObj = {};
   commentObj.comments = [];
   commentObj.id = postId + "_comment";
+  commentObj.body = "";
   for (var i=0; i<lines.length; i++) {
     var line = lines[i].split('{');
     var comment = {};
     comment.id = line[0];
-    comment.message = line[1];
+    commentObj.body += line[1];
+    //comment.message = line[1];
     comment.created = line[2];
     commentObj.comments.push(comment);
   }
 
   return commentObj;
 }
-/*
+
 function calculateTagCloud(commentId) {
-  client.count({
-    index: 'fbposts'
-  }).then(function (body) {
-    var docCount = body.count;
-    client.termvectors({
-      index: 'fbposts',
-      id: commentId,
-      termStatistics: true
-    }).then (function (stats) {
-      buildCloudStats(stats);
-    }, function(error1) {
-      console.trace(error1.message);
-    }
-  }, function (error) {
+  client.termvectors({
+    index: 'fbposts',
+    type: 'post',
+    id: commentId,
+    termStatistics: true
+  }).then (function (stats) {
+    buildCloudStats(commentId, stats);
+  }, function(error) {
     console.trace(error.message);
   });
 }
 
-function buildCloudStats(statistics) {
+function buildCloudStats(commentId, stats) {
+  var tagCloud = {};
+  tagCloud.terms = [];
+  var docCount = stats.term_vectors.body.field_statistics.doc_count;
+  var terms = Object.keys(stats.term_vectors.body.terms);
+  var i =0;
+  var wordCount = 0;
+  for (i=0; i<terms.length; i++) {
+    wordCount+=stats.term_vectors.body.terms[terms[i]].term_freq;
+  }
+  console.log(wordCount);
+  for (i=0; i<terms.length; i++) {
+    var termKey = terms[i];
+    var term = stats.term_vectors.body.terms[termKey];
+    var tf1 = term.term_freq;
+    var tf = term.term_freq/wordCount;
+    var df = term.doc_freq;
+    var idf = Math.log(docCount/df);
+    var tfidf = tf * idf;
+    var key = termKey.toString().concat("_");
+    tagCloud.terms.push(key, tfidf);
+    fs.appendFile(commentId+".csv", termKey + "," + tfidf +"," + tf1 + "," + df + "," + tf*100 + "," + idf + "\n", (err) => {
+      if (err) throw err;
+    });
+  }
 
-}*/
+  fs.writeFile(commentId+".cld.txt", JSON.stringify(tagCloud, null, 2), (err) => {
+    if (err) throw err;
+    console.log('DONE!');
+  });
+}
 /*
 var fs = require('fs');
 var FB = require('fb');
